@@ -1,6 +1,6 @@
-# FileFlow CLI
+# FileFlow
 
-A local, root-scoped file manager with an interactive shell and script mode. It previews and journals file mutations, supports conflict-aware undo, and finds duplicate content without modifying it.
+A local-first file workspace with two deliberately separate surfaces: the original CLI for explicit journaled operations, and a read-only ASP.NET Core API with an Angular operations console. The browser can inspect and preview plans, but cannot execute or undo anything.
 
 ## Features
 
@@ -17,11 +17,11 @@ A local, root-scoped file manager with an interactive shell and script mode. It 
 
 ## Tech Stack
 
-C# · .NET 9 · System.IO · xUnit
+C# · .NET 9 · ASP.NET Core · Angular 22 · TypeScript · Vitest · xUnit
 
 ## Architecture
 
-`FileFlow.Core` contains the command abstraction, session, local file-system adapter, immutable operation plans, validator/executor, JSON-lines journal, undo logic, duplicate scanner, tree walker, and Visitor. `FileFlow.Cli` contains the tokenizer, Builder, Chain of Responsibility parser, testable shell, and console host.
+`FileFlow.Core` contains the command abstraction, session, local file-system adapter, immutable operation plans, validator/executor, JSON-lines journal, undo logic, duplicate scanner, tree walker, and Visitor. `FileFlow.Cli` contains the tokenizer, Builder, Chain of Responsibility parser, testable shell, and console host. `FileFlow.Api` uses an immutable configured root and stateless path policy; it does not reuse the CLI's mutable session and exposes no mutation route. `frontend` is a standalone strict Angular explorer.
 
 The mutation path is explicit:
 
@@ -36,9 +36,12 @@ Dry-run stops after preview. A failed prepared-journal append causes no workspac
 
 - `src/FileFlow.Core` — file operations, journal/undo, duplicate analysis, and session rules.
 - `src/FileFlow.Cli` — parser and executable shell.
+- `src/FileFlow.Api` — bounded, loopback-only read API and non-persisting operation planner.
 - `tests/FileFlow.UnitTests` — tokenizer, parser, and path-boundary tests.
 - `tests/FileFlow.IntegrationTests` — real `LocalFileSystem` scenarios in isolated temporary directories.
+- `tests/FileFlow.ApiTests` — HTTP, path-policy, preview, route-inventory, and response-hardening tests.
 - `examples/commands.txt` — safe read-only example session.
+- `examples/demo-workspace` — browser explorer sample.
 
 ## Getting Started
 
@@ -67,6 +70,24 @@ dotnet run --project src/FileFlow.Cli -- --script examples/commands.txt
 ```
 
 Run `help` in the shell or pass `--help` for command syntax.
+
+Local API (listens on `http://127.0.0.1:5084`):
+
+```bash
+dotnet run --project src/FileFlow.Api
+```
+
+The default root is `examples/demo-workspace`. Override it only in trusted local configuration with `FileFlow__WorkspaceRoot` and keep `FileFlow__ApplicationDataRoot` separate. In another terminal:
+
+```bash
+cd frontend
+npm install
+npm start
+```
+
+Open `http://localhost:4200`. The development proxy preserves same-origin requests; the API has no CORS policy.
+
+Every `/api` request must include `X-FileFlow-Client: web`, which the Angular client supplies. This is not authentication or a secret; it makes browser requests non-simple, so an unrelated origin must pass a CORS preflight that this loopback service never permits. It reduces cross-origin resource abuse but does not make the API safe to expose beyond loopback.
 
 ## Tests
 
@@ -102,3 +123,5 @@ No implicit overwrite or force mode exists. Undo also refuses to proceed when th
 ## Limitations / Future Improvements
 
 FileFlow operates only on local files and intentionally refuses overwrites. Read-only navigation and `show` still follow operating-system symbolic-link semantics, so the connected root must not be treated as an access-control boundary; mutation and undo revalidate detected links, but this is not an atomic OS sandbox against concurrent replacement. Trash moves require the workspace and application-data root to support an ordinary file move; cross-volume trash is not implemented. Journal synchronization is process-local, JSONL appends are not fsynced or transactional, and a crash or completion-append failure can leave a prepared-only entry after a mutation; recovery is deliberately manual. Trash retention is also manual. Globbing and batch mutation are intentionally unsupported; run explicit single-file commands instead.
+
+The API is stricter than the CLI navigation surface: request paths are bounded root-relative values; existing symbolic-link/reparse components are rejected and checked again before reads and hashes. Listings, previews, duplicate scans, and history are capped. Preview accepts strict UTF-8 text only and returns at most 64 KiB. The service is designed for a trusted, non-adversarial local workspace and loopback use. File-system checks and reads are not an atomic OS sandbox, so an attacker able to replace workspace components concurrently can still create a TOCTOU race. Do not expose this API to a network or use an untrusted writable root.

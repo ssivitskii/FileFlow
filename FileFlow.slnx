@@ -1,9 +1,11 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/FileFlow.Api/FileFlow.Api.csproj" />
     <Project Path="src/FileFlow.Core/FileFlow.Core.csproj" />
     <Project Path="src/FileFlow.Cli/FileFlow.Cli.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/FileFlow.ApiTests/FileFlow.ApiTests.csproj" />
     <Project Path="tests/FileFlow.UnitTests/FileFlow.UnitTests.csproj" />
     <Project Path="tests/FileFlow.IntegrationTests/FileFlow.IntegrationTests.csproj" />
   </Folder>

@@ -1,0 +1,258 @@
+<header class="topbar">
+  <a class="brand" href="#main" aria-label="FileFlow home"
+    ><span>FF</span> FileFlow</a
+  >
+  <p><strong>Local mode</strong> · Read-only API</p>
+</header>
+
+<main id="main">
+  <section class="hero">
+    <div>
+      <p class="eyebrow">WORKSPACE OBSERVATORY</p>
+      <h1>See the shape of your files.<br /><em>Change nothing.</em></h1>
+      <p class="lede">
+        Browse, inspect, and plan with a bounded local API. Every operation
+        below is a preview.
+      </p>
+    </div>
+    <div class="safety">
+      <span aria-hidden="true">◎</span><strong>Mutation lock</strong
+      ><small>No execute routes exist</small>
+    </div>
+  </section>
+
+  <nav class="crumbs" aria-label="Current directory">
+    @for (crumb of breadcrumbs; track crumb.path; let last = $last) {
+      <button
+        type="button"
+        (click)="openDirectory(crumb.path)"
+        [disabled]="last"
+      >
+        {{ crumb.label }}
+      </button>
+      @if (!last) {
+        <span>/</span>
+      }
+    }
+  </nav>
+
+  <div class="layout">
+    <section class="panel explorer" aria-labelledby="files-title">
+      <div class="panel-head">
+        <div>
+          <p class="kicker">01 / EXPLORE</p>
+          <h2 id="files-title">{{ path }}</h2>
+        </div>
+        <span>{{ entries.length }} items</span>
+      </div>
+      @if (listState === "loading") {
+        <p class="state">Reading directory…</p>
+      }
+      @if (listState === "error") {
+        <p class="state error">
+          {{ listError }}
+          <button type="button" (click)="openDirectory(path)">Retry</button>
+        </p>
+      }
+      @if (listState === "empty") {
+        <p class="state">This directory is empty.</p>
+      }
+      <ul class="file-list">
+        @for (entry of entries; track entry.path) {
+          <li>
+            <button
+              type="button"
+              (click)="open(entry)"
+              [disabled]="entry.kind === 'link'"
+            >
+              <span class="file-icon" [attr.data-kind]="entry.kind">{{
+                entry.kind === "directory"
+                  ? "↗"
+                  : entry.kind === "file"
+                    ? "·"
+                    : "×"
+              }}</span>
+              <span
+                ><strong>{{ entry.name }}</strong
+                ><small
+                  >{{ entry.kind }}
+                  @if (entry.size !== null) {
+                    · {{ entry.size | number }} B
+                  }
+                </small></span
+              >
+            </button>
+          </li>
+        }
+      </ul>
+    </section>
+
+    <section class="panel preview" aria-labelledby="preview-title">
+      <div class="panel-head">
+        <div>
+          <p class="kicker">02 / INSPECT</p>
+          <h2 id="preview-title">Text preview</h2>
+        </div>
+      </div>
+      @if (previewState === "idle") {
+        <p class="state">Select a UTF-8 text file to inspect up to 64 KiB.</p>
+      }
+      @if (previewState === "loading") {
+        <p class="state">Opening safely…</p>
+      }
+      @if (previewState === "error") {
+        <p class="state error">{{ previewError }}</p>
+      }
+      @if (preview) {
+        <div class="preview-meta">
+          <strong>{{ preview.path }}</strong
+          ><span
+            >{{ preview.bytesRead | number }} bytes
+            @if (preview.truncated) {
+              · truncated
+            }
+          </span>
+        </div>
+        <pre>{{ preview.text }}</pre>
+      }
+    </section>
+  </div>
+
+  <div class="layout lower">
+    <section class="panel tools">
+      <p class="kicker">03 / ANALYZE</p>
+      <h2>Duplicate radar</h2>
+      <button
+        class="primary"
+        type="button"
+        (click)="scanDuplicates()"
+        [disabled]="duplicateState === 'loading'"
+      >
+        {{ duplicateState === "loading" ? "Scanning…" : "Scan this subtree" }}
+      </button>
+      @if (duplicateState === "empty") {
+        <p class="state">No duplicates found within the safe scan limits.</p>
+      }
+      @if (duplicateState === "error") {
+        <p class="state error">{{ duplicateError }}</p>
+      }
+      @for (group of duplicateGroups; track group.sha256) {
+        <article class="duplicate">
+          <strong>{{ group.size | number }} bytes</strong
+          ><small>{{ group.files.length }} identical files</small>
+          @for (file of group.files; track file.path) {
+            <code>{{ file.path }}</code>
+          }
+        </article>
+      }
+    </section>
+
+    <section class="panel tools">
+      <p class="kicker">04 / PLAN</p>
+      <h2>Operation preview</h2>
+      <p class="notice">
+        Preview only — nothing is written, moved, or deleted.
+      </p>
+      <form (ngSubmit)="previewOperation()">
+        <label
+          >Operation<select
+            name="operation"
+            [(ngModel)]="operation.operation"
+            (ngModelChange)="operationChanged()"
+          >
+            <option value="copy">Copy</option>
+            <option value="move">Move</option>
+            <option value="rename">Rename</option>
+            <option value="delete">Delete</option>
+          </select></label
+        >
+        <label
+          >Source<input
+            name="source"
+            [(ngModel)]="operation.source"
+            (ngModelChange)="operationChanged()"
+            required
+            placeholder="notes/todo.txt"
+        /></label>
+        @if (operation.operation !== "delete") {
+          <label
+            >Destination<input
+              name="destination"
+              [(ngModel)]="operation.destination"
+              (ngModelChange)="operationChanged()"
+              required
+              placeholder="archive/todo.txt"
+          /></label>
+        }
+        <button
+          class="primary"
+          type="submit"
+          [disabled]="operationState === 'loading' || !operation.source.trim()"
+        >
+          {{
+            operationState === "loading" ? "Validating…" : "Preview operation"
+          }}
+        </button>
+      </form>
+      @if (operationState === "error") {
+        <p class="state error">{{ operationError }}</p>
+      }
+      @if (operationResult) {
+        <div class="result" [class.valid]="operationResult.isValid">
+          <strong>{{
+            operationResult.isValid
+              ? "Plan is valid"
+              : operationResult.isConflict
+                ? "Conflict found"
+                : "Plan is invalid"
+          }}</strong>
+          <p>{{ operationResult.summary }}</p>
+        </div>
+      }
+    </section>
+  </div>
+
+  <section class="panel history">
+    <div class="panel-head">
+      <div>
+        <p class="kicker">05 / TRACE</p>
+        <h2>Redacted local history</h2>
+      </div>
+      <button
+        type="button"
+        (click)="loadHistory()"
+        [disabled]="historyState === 'loading'"
+      >
+        Refresh
+      </button>
+    </div>
+    @if (historyState === "loading") {
+      <p class="state">Reading journal…</p>
+    }
+    @if (historyState === "empty") {
+      <p class="state">No recorded operations for this workspace.</p>
+    }
+    @if (historyState === "error") {
+      <p class="state error">{{ historyError }}</p>
+    }
+    <ol class="timeline">
+      @for (item of history; track item.id) {
+        <li>
+          <span></span>
+          <div>
+            <strong>{{ item.kind }} · {{ item.status }}</strong>
+            <p>
+              {{ item.source }}
+              @if (item.destination) {
+                → {{ item.destination }}
+              }
+            </p>
+            <small>{{ item.time | date: "medium" }}</small>
+          </div>
+        </li>
+      }
+    </ol>
+  </section>
+</main>
+
+<footer>FILEFLOW / LOCAL-FIRST / NO MUTATION API</footer>

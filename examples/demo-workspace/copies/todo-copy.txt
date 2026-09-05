@@ -1,0 +1,2 @@
+Review the duplicate report.
+Preview a rename without changing this workspace.

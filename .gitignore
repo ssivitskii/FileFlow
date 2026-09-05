@@ -21,3 +21,8 @@ coverage*
 .env
 .env.*
 !.env.example
+
+node_modules/
+.angular/
+dist/
+.fileflow-data/
