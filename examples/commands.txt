@@ -1,0 +1,6 @@
+connect .
+pwd
+ls
+tree --depth 1
+disconnect
+exit
